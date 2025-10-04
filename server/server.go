@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/gorilla/websocket"
-	"github.com/rohanmathur91/tunnel/utils"
 )
 
 type Server struct{}
@@ -19,7 +18,7 @@ func (s *Server) HandleHealthCheck(w http.ResponseWriter, r *http.Request) {
 		"status": "healthy",
 	}
 
-	utils.SendJSONResponse(w, res)
+	SendJSONResponse(w, res)
 }
 
 var upgrader = websocket.Upgrader{
