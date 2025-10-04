@@ -12,8 +12,8 @@ const port = 8000
 
 func main() {
 	wsServer := server.New()
+	http.HandleFunc("/", wsServer.HandleNewConnection)
 	http.HandleFunc("/echo", wsServer.HandleEcho)
-	http.HandleFunc("/new", wsServer.HandleNewConnection)
 	http.HandleFunc("/health", wsServer.HandleHealthCheck)
 
 	httpServer := http.Server{
