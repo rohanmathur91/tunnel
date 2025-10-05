@@ -1,17 +1,19 @@
 ## Tunnel
 
 
-Start server: This will and provide an endpoint for clients to connect to
+Start server
 ```sh
 go run main.go
 ```
 
-Start client
+Start client: Gives public URL
 ```sh
-go run client/main.go
+cd ./client
+go build -o tunnel ./
+./tunnel --port 3000
 ``` 
 
-Test connection
-```sh        
-curl localhost:8000\?tunnelId=123
+Test connection:
+```txt
+curl [Public URL]
 ```

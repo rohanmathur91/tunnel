@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -98,7 +99,10 @@ func (s *Server) HandleHttp(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(response.Status)
 	w.Write(response.Body)
-	fmt.Fprintln(w, response)
+
+	prettyJSON, _ := json.MarshalIndent(request, "", "  ")
+	fmt.Printf("Response: \n%s\n", string(prettyJSON))
+	fmt.Fprintln(w, string(prettyJSON))
 }
 
 func (s *Server) HandleNewConnection(w http.ResponseWriter, r *http.Request) {
@@ -146,7 +150,6 @@ func (s *Server) HandleNewConnection(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for {
-		// TODO: read incomming response and send back to response channel
 		var response dto.Response
 		err := connection.ReadJSON(&response)
 		if err != nil {
@@ -157,7 +160,8 @@ func (s *Server) HandleNewConnection(w http.ResponseWriter, r *http.Request) {
 		pendingResponseChannel := responseChannels[response.RequestId]
 		pendingResponseChannel <- response
 
-		fmt.Printf("Incomming response: %+v\n", response)
+		prettyJSON, _ := json.MarshalIndent(response, "", "  ")
+		fmt.Printf("Incomming response: %+v\n", string(prettyJSON))
 	}
 }
 
