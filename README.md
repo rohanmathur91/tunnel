@@ -1,12 +1,11 @@
 ## Tunnel
 
-
 Start server
 ```sh
 go run main.go
 ```
 
-Start client: Gives public URL
+Start client - gives public URL
 ```sh
 cd ./client
 go build -o tunnel ./
