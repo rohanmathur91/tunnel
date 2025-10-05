@@ -8,6 +8,7 @@ import (
 )
 
 /*
+
 Client
 - [DONE] Connect to websocket server
 - [DONE] Test it
@@ -22,6 +23,7 @@ Server
 Client
 - Prepare client to run in CLI, add ability to do something like
 	tunnel --port 3000 (this should give a server URL)
+
 */
 
 func main() {
@@ -30,10 +32,8 @@ func main() {
 
 	fmt.Println("Client port", *port)
 
-	const server = "ws://localhost:8000/"
+	const server = "ws://localhost:8000/tunnel"
 	connection, _, err := websocket.DefaultDialer.Dial(server, nil)
-
-	// fmt.Println("Websocket connection, response", response)
 
 	if err != nil {
 		fmt.Println("Client cannot be connected to websocket server!", err)
