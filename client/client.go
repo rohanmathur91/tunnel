@@ -38,16 +38,16 @@ func (c *Client) Start() {
 
 	defer connection.Close()
 
-	var info dto.ClientTunnelInfo
-	err = connection.ReadJSON(&info)
+	var tunnelInfo dto.ClientTunnelInfo
+	err = connection.ReadJSON(&tunnelInfo)
 	if err != nil {
-		log.Println("Client cannot read connection info! ", err)
+		log.Println("Client cannot read connection tunnelInfo! ", err)
 		return
 	}
 
 	fmt.Println("-----------------------------------------")
-	fmt.Printf("Tunnel ID:  %s\n", info.Id)
-	fmt.Printf("Public URL: %s\n", info.Url)
+	fmt.Printf("Tunnel ID:  %s\n", tunnelInfo.Id)
+	fmt.Printf("Public URL: %s\n", tunnelInfo.Url)
 	fmt.Printf("Forwarding: %s:%d\n", baseUrl, port)
 	fmt.Println("-----------------------------------------")
 
@@ -62,7 +62,7 @@ func (c *Client) Start() {
 		prettyJSON, _ := json.MarshalIndent(request, "", "  ")
 		fmt.Printf("Incomming request:\n%s\n", string(prettyJSON))
 
-		response, err := c.sendRequest(connection, request)
+		response, err := c.sendRequest(connection, tunnelInfo, request)
 
 		if err != nil {
 			c.sendErrorResponseToTunnel(connection, request.Id, http.StatusInternalServerError, err.Error())
@@ -72,10 +72,13 @@ func (c *Client) Start() {
 	}
 }
 
-func (c *Client) sendRequest(conn *websocket.Conn, request dto.Request) (*http.Response, error) {
+func (c *Client) sendRequest(conn *websocket.Conn, tunnelInfo dto.ClientTunnelInfo, request dto.Request) (*http.Response, error) {
+	// TODO: fix tunnel context
 	localURL := fmt.Sprintf("%s:%d%s", baseUrl, c.port, request.Path)
 	if request.Query != "" {
-		localURL += "?" + request.Query
+		localURL += "?" + request.Query + "&tunnelId=" + tunnelInfo.Id
+	} else {
+		localURL += "?tunnelId=" + tunnelInfo.Id
 	}
 
 	httpReq, err := http.NewRequest(request.Method, localURL, bytes.NewReader(request.Body))
@@ -112,7 +115,6 @@ func (c *Client) sendErrorResponseToTunnel(conn *websocket.Conn, requestId strin
 func (c *Client) sendResponseToTunnel(conn *websocket.Conn, requestId string, rawResponse http.Response) error {
 
 	body, err := io.ReadAll(rawResponse.Body)
-
 	if err != nil {
 		fmt.Println("Error while reading body ", err)
 		return err
