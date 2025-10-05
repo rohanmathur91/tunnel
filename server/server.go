@@ -1,26 +1,32 @@
 package server
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"sync"
 
 	"github.com/gorilla/websocket"
 	"github.com/rohanmathur91/tunnel/dto"
+	"github.com/rohanmathur91/tunnel/utils"
 )
+
+type ResponseChannels map[string]chan dto.Response
 
 type Tunnel struct {
 	connection       *websocket.Conn
-	responseChannels map[string]chan dto.Response
+	responseChannels ResponseChannels
 }
 
 type Server struct {
 	mutex   sync.RWMutex
-	tunnels map[string]Tunnel
+	tunnels map[string]*Tunnel
 }
 
 func New() *Server {
-	return &Server{}
+	return &Server{
+		tunnels: make(map[string]*Tunnel),
+	}
 }
 
 var upgrader = websocket.Upgrader{
@@ -32,49 +38,58 @@ var upgrader = websocket.Upgrader{
 func (s *Server) HandleHttp(w http.ResponseWriter, r *http.Request) {
 	tunnelId := r.URL.Query().Get("tunnelId")
 	if len(tunnelId) == 0 {
-		log.Fatal("Invalid tunnel id", tunnelId)
+		fmt.Println("Invalid tunnel id", tunnelId)
 		http.Error(w, "Invalid tunnel id", http.StatusNotFound)
+		return
 	}
 
+	s.mutex.RLock()
 	tunnelDetails, exists := s.tunnels[tunnelId]
+	s.mutex.RUnlock()
 
 	if !exists {
-		log.Fatal("Invalid tunnel URL", tunnelId)
+		fmt.Println("Invalid tunnel URL", tunnelId)
 		http.Error(w, "Forward the port first", http.StatusInternalServerError)
-
+		return
 	}
 
-	request, rawRequest := dto.ToJSONRequest(r)
+	fmt.Printf("Tunnel id from http handler %v\n", tunnelId)
 
+	request := dto.ToRequest(r)
 	if request == nil {
-		log.Fatal("Something went wrong!", rawRequest)
+		fmt.Println("Something went wrong!", request)
 		http.Error(w, "Something went wrong!", http.StatusInternalServerError)
+		return
 	}
+
+	fmt.Println("Forwarding request...")
 
 	err := tunnelDetails.connection.WriteJSON(request)
 	if err != nil {
 		log.Fatal("Failed to forward request", err)
 		http.Error(w, "Failed to forward request", http.StatusInternalServerError)
+		return
 	}
 
 	responseChannel := make(chan dto.Response, 1)
 
 	s.mutex.Lock()
-	tunnelDetails.responseChannels[rawRequest.Id] = responseChannel
+	tunnelDetails.responseChannels[request.Id] = responseChannel
 	s.mutex.Unlock()
 
 	defer func() {
 		// cleanup
 		s.mutex.Lock()
 		close(responseChannel)
-		delete(tunnelDetails.responseChannels, rawRequest.Id)
+		delete(tunnelDetails.responseChannels, request.Id)
 		s.mutex.Unlock()
 	}()
 
-	log.Print("Waiting for response...")
+	fmt.Printf("Tunnel details: %+v\n", tunnelDetails)
+	fmt.Println("Waiting for response...")
 	response := <-responseChannel
 
-	log.Print("response received from tunnel", response)
+	fmt.Printf("Response received from tunnel %+v\n", response)
 	for key, values := range response.Header {
 		for _, value := range values {
 			w.Header().Add(key, value)
@@ -83,29 +98,66 @@ func (s *Server) HandleHttp(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(response.Status)
 	w.Write(response.Body)
+	fmt.Fprintln(w, response)
 }
 
 func (s *Server) HandleNewConnection(w http.ResponseWriter, r *http.Request) {
 	connection, err := upgrader.Upgrade(w, r, nil)
 
 	if err != nil {
-		log.Fatal("Cannot create new connection", err)
+		fmt.Println("Cannot create new connection", err)
+		http.Error(w, "Failed to upgrade", http.StatusInternalServerError)
 		return
 	}
 
 	defer connection.Close()
 
-	log.Println("Client connected, new connection created!")
+	// init connection/tunnel
+	tunnelId := utils.GenerateID()
+	tunnel := &Tunnel{
+		connection:       connection,
+		responseChannels: make(ResponseChannels),
+	}
+
+	s.mutex.Lock()
+	s.tunnels[tunnelId] = tunnel
+	s.mutex.Unlock()
+
+	defer func() {
+		s.mutex.Lock()
+		delete(s.tunnels, tunnelId)
+		s.mutex.Unlock()
+		log.Printf("Tunnel %s disconnected", tunnelId)
+	}()
+
+	fmt.Println("Client connected, new connection created!", tunnelId)
+
+	tunnelInfo := dto.ClientTunnelInfo{
+		Id:  tunnelId,
+		Url: fmt.Sprintf("http://localhost:8000/?tunnelId=%s", tunnelId),
+	}
+
+	fmt.Printf("TunnelInfo %+v\n", tunnelInfo)
+
+	err = connection.WriteJSON(tunnelInfo)
+	if err != nil {
+		fmt.Println("Cannot send message from", err)
+		return
+	}
 
 	for {
-		messageType, message, err := connection.ReadMessage()
+		// TODO: read incomming response and send back to response channel
+		var response dto.Response
+		err := connection.ReadJSON(&response)
 		if err != nil {
-			log.Fatal("Cannot read message from echo", err)
-			return
+			fmt.Println("Cannot read message from client ", err)
 		}
 
-		log.Println("echo::", messageType)
-		log.Println("message::", string(message))
+		responseChannels := s.tunnels[tunnelId].responseChannels
+		pendingResponseChannel := responseChannels[response.RequestId]
+		pendingResponseChannel <- response
+
+		fmt.Printf("Incomming response: %+v\n", response)
 	}
 }
 
@@ -113,25 +165,25 @@ func (s *Server) HandleEcho(w http.ResponseWriter, r *http.Request) {
 	connection, err := upgrader.Upgrade(w, r, nil)
 
 	if err != nil {
-		log.Fatal("Cannot create new connection", err)
+		fmt.Println("Cannot create new connection", err)
 		return
 	}
 
 	defer connection.Close()
 
-	log.Println("Client connected, new connection created!")
+	fmt.Println("Echo: new connection created!")
 
 	for {
-		messageType, message, err := connection.ReadMessage()
+		var message any
+		err := connection.ReadJSON(&message)
 		if err != nil {
-			log.Fatal("Cannot read message from echo", err)
+			fmt.Println("Cannot read message from echo ", err)
 			return
 		}
 
-		log.Println("echo::", messageType)
-		err = connection.WriteMessage(messageType, message)
+		err = connection.WriteJSON(message)
 		if err != nil {
-			log.Fatal("Cannot write message from echo", err)
+			fmt.Println("Cannot write message from echo ", err)
 			return
 		}
 	}
@@ -143,5 +195,5 @@ func (s *Server) HandleHealthCheck(w http.ResponseWriter, r *http.Request) {
 		"status": "healthy",
 	}
 
-	SendJSONResponse(w, res)
+	utils.SendJSONResponse(w, res)
 }

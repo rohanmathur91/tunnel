@@ -1,12 +1,11 @@
 package dto
 
 import (
-	"encoding/json"
 	"io"
 	"log"
 	"net/http"
 
-	"github.com/google/uuid"
+	"github.com/rohanmathur91/tunnel/utils"
 )
 
 type ClientTunnelInfo struct {
@@ -24,7 +23,7 @@ type Request struct {
 }
 
 type Response struct {
-	RequestId string              `json:"request_id"`
+	RequestId string              `json:"requestId"`
 	Header    map[string][]string `json:"header"`
 	Body      []byte              `json:"body"`
 	Status    int                 `json:"status"`
@@ -40,23 +39,11 @@ func ToRequest(r *http.Request) *Request {
 	}
 
 	return &Request{
-		Id:     uuid.NewString(),
+		Id:     utils.GenerateID(),
 		Method: r.Method,
 		Header: r.Header,
 		Path:   r.URL.Path,
 		Query:  r.URL.RawQuery,
 		Body:   body,
 	}
-}
-
-func ToJSONRequest(r *http.Request) ([]byte, *Request) {
-	request := ToRequest(r)
-	jsonBytes, err := json.Marshal(request)
-
-	if err != nil {
-		log.Fatal("Cannot parse request into json", err)
-		return nil, request
-	}
-
-	return jsonBytes, request
 }

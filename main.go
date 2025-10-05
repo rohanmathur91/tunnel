@@ -22,7 +22,7 @@ func main() {
 		Addr: fmt.Sprintf(":%d", port),
 	}
 
-	fmt.Printf("Server running on port %d...", port)
+	fmt.Printf("Server running on port %d... \n", port)
 
 	err := httpServer.ListenAndServe()
 
