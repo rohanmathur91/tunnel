@@ -99,10 +99,7 @@ func (s *Server) HandleHttp(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(response.Status)
 	w.Write(response.Body)
-
-	prettyJSON, _ := json.MarshalIndent(request, "", "  ")
-	fmt.Printf("Response: \n%s\n", string(prettyJSON))
-	fmt.Fprintln(w, string(prettyJSON))
+	utils.SendJSONResponse(w, http.StatusOK, response)
 }
 
 func (s *Server) HandleNewConnection(w http.ResponseWriter, r *http.Request) {
@@ -199,5 +196,5 @@ func (s *Server) HandleHealthCheck(w http.ResponseWriter, r *http.Request) {
 		"status": "healthy",
 	}
 
-	utils.SendJSONResponse(w, res)
+	utils.SendJSONResponse(w, http.StatusOK, res)
 }
