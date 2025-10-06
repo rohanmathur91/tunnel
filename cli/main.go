@@ -5,7 +5,7 @@ import (
 )
 
 func main() {
-	port := flag.Int("port", 3000, "local port")
+	port := flag.Int("port", 3000, "localhost port to expose")
 	flag.Parse()
 
 	config := LoadConfig()
