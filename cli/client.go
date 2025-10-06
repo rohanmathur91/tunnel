@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 
 	"github.com/gorilla/websocket"
 	"github.com/rohanmathur91/tunnel/dto"
@@ -62,25 +63,43 @@ func (c *Client) Start() {
 		prettyJSON, _ := json.MarshalIndent(request, "", "  ")
 		fmt.Printf("Incomming request:\n%s\n", string(prettyJSON))
 
-		response, err := c.sendRequest(connection, tunnelInfo, request)
-
-		if err != nil {
-			c.sendErrorResponseToTunnel(connection, request.Id, http.StatusInternalServerError, err.Error())
-		} else {
-			c.sendResponseToTunnel(connection, request.Id, *response)
-		}
+		// this is blocking
+		c.handleRequest(connection, tunnelInfo, request)
 	}
 }
 
-func (c *Client) sendRequest(conn *websocket.Conn, tunnelInfo dto.ClientTunnelInfo, request dto.Request) (*http.Response, error) {
-	// TODO: fix tunnel context
-	localURL := fmt.Sprintf("%s:%d%s", baseUrl, c.port, request.Path)
-	if request.Query != "" {
-		localURL += "?" + request.Query + "&tunnelId=" + tunnelInfo.Id
-	} else {
-		localURL += "?tunnelId=" + tunnelInfo.Id
+func (c *Client) prepareUrl(tunnelInfo dto.ClientTunnelInfo, request dto.Request) string {
+	baseURL, err := url.Parse(fmt.Sprintf("%s:%d", baseUrl, c.port))
+	if err != nil {
+		fmt.Println("Invalid base URL: %w", err)
+		return ""
 	}
 
+	baseURL.Path = request.Path
+	query := baseURL.Query()
+	if request.Query != "" {
+		existingParams, err := url.ParseQuery(request.Query)
+		if err != nil {
+			fmt.Println("Invalid query string: %w", err)
+			return ""
+		}
+
+		for key, values := range existingParams {
+			for _, value := range values {
+				query.Add(key, value)
+			}
+		}
+	}
+
+	query.Set("tunnelId", tunnelInfo.Id)
+	baseURL.RawQuery = query.Encode()
+	localURL := baseURL.String()
+	log.Printf("Forwarding to: %s", localURL)
+	return localURL
+}
+
+func (c *Client) sendRequest(conn *websocket.Conn, tunnelInfo dto.ClientTunnelInfo, request dto.Request) (*http.Response, error) {
+	localURL := c.prepareUrl(tunnelInfo, request)
 	httpReq, err := http.NewRequest(request.Method, localURL, bytes.NewReader(request.Body))
 
 	if err != nil {
@@ -96,8 +115,8 @@ func (c *Client) sendRequest(conn *websocket.Conn, tunnelInfo dto.ClientTunnelIn
 		}
 	}
 
+	httpReq.Header.Add("x-tunnel-id", tunnelInfo.Id)
 	httpClient := &http.Client{}
-
 	return httpClient.Do(httpReq)
 }
 
@@ -131,4 +150,14 @@ func (c *Client) sendResponseToTunnel(conn *websocket.Conn, requestId string, ra
 
 	err = conn.WriteJSON(res)
 	return err
+}
+
+func (c *Client) handleRequest(conn *websocket.Conn, tunnelInfo dto.ClientTunnelInfo, request dto.Request) {
+	response, err := c.sendRequest(conn, tunnelInfo, request)
+
+	if err != nil {
+		c.sendErrorResponseToTunnel(conn, request.Id, http.StatusInternalServerError, err.Error())
+	} else {
+		c.sendResponseToTunnel(conn, request.Id, *response)
+	}
 }
