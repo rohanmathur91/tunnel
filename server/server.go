@@ -16,6 +16,7 @@ import (
 type ResponseChannels map[string]chan dto.Response
 
 type Tunnel struct {
+	mutex            sync.RWMutex
 	connection       *websocket.Conn
 	responseChannels ResponseChannels
 }
@@ -94,20 +95,20 @@ func (s *Server) HandleHttp(w http.ResponseWriter, r *http.Request) {
 
 	responseChannel := make(chan dto.Response, 1)
 
-	s.mutex.Lock()
+	tunnelDetails.mutex.Lock()
 	tunnelDetails.responseChannels[request.Id] = responseChannel
-	s.mutex.Unlock()
+	tunnelDetails.mutex.Unlock()
 
 	defer func() {
-		s.mutex.Lock()
+		tunnelDetails.mutex.Lock()
 		close(responseChannel)
 		delete(tunnelDetails.responseChannels, request.Id)
-		s.mutex.Unlock()
+		tunnelDetails.mutex.Unlock()
 	}()
 
 	fmt.Printf("Tunnel details: %+v\n", tunnelDetails)
 	fmt.Println("Waiting for response...")
-	response := <-responseChannel
+	response := <-responseChannel // blocks here
 
 	fmt.Printf("Response received from tunnel %+v\n", response)
 	for key, values := range response.Header {
