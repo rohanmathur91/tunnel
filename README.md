@@ -2,7 +2,7 @@
 
 #### A minimal ngrok-like tool that exposes local servers to the public internet via websocket tunnels.
 
-Start websocket server:
+Start server:
 ```sh
 go run main.go
 ```
