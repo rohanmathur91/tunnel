@@ -9,7 +9,7 @@ go run main.go
 
 Build client: 
 ```sh
-cd ./client
+cd ./cli
 go build -o tunnel ./
 ``` 
 
