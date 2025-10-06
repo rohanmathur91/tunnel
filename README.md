@@ -1,7 +1,9 @@
 ## Tunnel
 
-#### A minimal ngrok-like tool that exposes local servers to the public internet via websocket tunnels.
+### A minimal ngrok-like tool that exposes local servers to the public internet via websocket tunnels.
 
+
+### Steps to setup servers:
 Start server:
 ```sh
 go run main.go
@@ -15,7 +17,7 @@ go build -o tunnel ./
 
 Start client - gives public URL
 ```sh 
-./tunnel --port 3000 // local server port
+./tunnel --port 3000 #local server port
 ```
 
 
@@ -29,3 +31,10 @@ Test tunnel:
 ```txt
 curl [Public URL]
 ```
+
+
+### Demo:
+
+https://github.com/user-attachments/assets/24905fe6-8bd8-49b7-a892-9704178d66f6
+
+https://github.com/user-attachments/assets/f4257b0f-e064-4c21-b462-eda5b76252dc
