@@ -2,19 +2,30 @@
 
 #### A minimal ngrok-like tool that exposes local servers to the public internet via websocket tunnels.
 
-Start websocket server
+Start websocket server:
 ```sh
 go run main.go
 ```
 
-Start client - gives public URL
+Build client: 
 ```sh
 cd ./client
 go build -o tunnel ./
-./tunnel --port 3000
 ``` 
 
-Test connection:
+Start client - gives public URL
+```sh 
+./tunnel --port 3000 // local server port
+```
+
+
+Start test server or use any local server:
+```sh
+cd ./test-server
+go run main.go
+```
+
+Test tunnel:
 ```txt
 curl [Public URL]
 ```
