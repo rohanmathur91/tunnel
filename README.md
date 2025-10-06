@@ -35,6 +35,10 @@ curl [Public URL]
 
 ### Demo:
 
+Start the server, build the client, and expose the localhost port:
+
 https://github.com/user-attachments/assets/24905fe6-8bd8-49b7-a892-9704178d66f6
+
+Run test server and hit the request:
 
 https://github.com/user-attachments/assets/f4257b0f-e064-4c21-b462-eda5b76252dc
