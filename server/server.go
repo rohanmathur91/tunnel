@@ -71,11 +71,9 @@ func (s *Server) HandleHttp(w http.ResponseWriter, r *http.Request) {
 
 	if !exists {
 		fmt.Println("Invalid tunnel URL", tunnelId)
-		http.Error(w, "Forward the port first", http.StatusInternalServerError)
+		http.Error(w, "Invalid tunnel", http.StatusInternalServerError)
 		return
 	}
-
-	fmt.Printf("Tunnel id from http handler %v\n", tunnelId)
 
 	request := dto.CreateRequest(r)
 	if request == nil {
@@ -110,13 +108,14 @@ func (s *Server) HandleHttp(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Waiting for response...")
 	response := <-responseChannel // blocks here
 
-	fmt.Printf("Response received from tunnel %+v\n", response)
+	fmt.Println("Response received from tunnel!")
 	for key, values := range response.Header {
 		for _, value := range values {
 			w.Header().Add(key, value)
 		}
 	}
 
+	w.Header().Add("x-tunnel-id", tunnelId)
 	w.WriteHeader(response.Status)
 	w.Write(response.Body)
 }
@@ -150,14 +149,17 @@ func (s *Server) HandleNewConnection(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Tunnel %s disconnected", tunnelId)
 	}()
 
-	fmt.Println("Client connected, new connection created!", tunnelId)
+	fmt.Println("New tunnel created with id:", tunnelId)
 
 	tunnelInfo := dto.TunnelInfo{
 		Id:  tunnelId,
 		Url: fmt.Sprintf("http://%s.%s:%d", tunnelId, s.config.Domain, s.config.Port),
 	}
 
-	fmt.Printf("TunnelInfo %+v\n", tunnelInfo)
+	fmt.Println("-----------------------------------------")
+	fmt.Printf("Tunnel ID:  %s\n", tunnelInfo.Id)
+	fmt.Printf("Public URL: %s\n", tunnelInfo.Url)
+	fmt.Println("-----------------------------------------")
 
 	err = connection.WriteJSON(tunnelInfo)
 	if err != nil {
