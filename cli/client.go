@@ -26,7 +26,7 @@ func NewClient(port int, config *Config) *Client {
 
 func (c *Client) Start() {
 	port := c.port
-	log.Println("Client port", port)
+	fmt.Println("Client port", port)
 
 	connection, _, err := websocket.DefaultDialer.Dial(c.config.ServerUrl, nil)
 
@@ -58,8 +58,7 @@ func (c *Client) Start() {
 			return
 		}
 
-		// this is blocking
-		c.handleRequest(connection, tunnelInfo, request)
+		go c.handleRequest(connection, request)
 	}
 }
 
@@ -91,7 +90,7 @@ func (c *Client) prepareClientUrl(request dto.Request) string {
 	return localURL
 }
 
-func (c *Client) sendRequest(conn *websocket.Conn, tunnelInfo dto.TunnelInfo, request dto.Request) (*http.Response, error) {
+func (c *Client) executeRequest(conn *websocket.Conn, request dto.Request) (*http.Response, error) {
 	localURL := c.prepareClientUrl(request)
 	httpReq, err := http.NewRequest(request.Method, localURL, bytes.NewReader(request.Body))
 
@@ -108,7 +107,6 @@ func (c *Client) sendRequest(conn *websocket.Conn, tunnelInfo dto.TunnelInfo, re
 		}
 	}
 
-	httpReq.Header.Add("x-tunnel-id", tunnelInfo.Id)
 	httpClient := &http.Client{}
 	log.Printf("Sending: %s", localURL)
 	return httpClient.Do(httpReq)
@@ -126,7 +124,6 @@ func (c *Client) sendErrorResponseToTunnel(conn *websocket.Conn, requestId strin
 }
 
 func (c *Client) sendResponseToTunnel(conn *websocket.Conn, requestId string, rawResponse http.Response) error {
-
 	body, err := io.ReadAll(rawResponse.Body)
 	if err != nil {
 		fmt.Println("Error while reading body ", err)
@@ -146,8 +143,8 @@ func (c *Client) sendResponseToTunnel(conn *websocket.Conn, requestId string, ra
 	return err
 }
 
-func (c *Client) handleRequest(conn *websocket.Conn, tunnelInfo dto.TunnelInfo, request dto.Request) {
-	response, err := c.sendRequest(conn, tunnelInfo, request)
+func (c *Client) handleRequest(conn *websocket.Conn, request dto.Request) {
+	response, err := c.executeRequest(conn, request)
 
 	if err != nil {
 		c.sendErrorResponseToTunnel(conn, request.Id, http.StatusInternalServerError, err.Error())
