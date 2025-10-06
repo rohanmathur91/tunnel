@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -14,23 +13,22 @@ import (
 )
 
 type Client struct {
-	port int
+	port   int
+	config Config
 }
 
-func NewClient(port int) *Client {
+func NewClient(port int, config *Config) *Client {
 	return &Client{
-		port: port,
+		port:   port,
+		config: *config,
 	}
 }
-
-const baseUrl = "http://localhost"
-const serverUrl = "ws://localhost:8000/tunnel"
 
 func (c *Client) Start() {
 	port := c.port
 	log.Println("Client port", port)
 
-	connection, _, err := websocket.DefaultDialer.Dial(serverUrl, nil)
+	connection, _, err := websocket.DefaultDialer.Dial(c.config.ServerUrl, nil)
 
 	if err != nil {
 		log.Println("Client cannot be connected to websocket server!", err)
@@ -39,7 +37,7 @@ func (c *Client) Start() {
 
 	defer connection.Close()
 
-	var tunnelInfo dto.ClientTunnelInfo
+	var tunnelInfo dto.TunnelInfo
 	err = connection.ReadJSON(&tunnelInfo)
 	if err != nil {
 		log.Println("Client cannot read connection tunnelInfo! ", err)
@@ -49,7 +47,7 @@ func (c *Client) Start() {
 	fmt.Println("-----------------------------------------")
 	fmt.Printf("Tunnel ID:  %s\n", tunnelInfo.Id)
 	fmt.Printf("Public URL: %s\n", tunnelInfo.Url)
-	fmt.Printf("Forwarding: %s:%d\n", baseUrl, port)
+	fmt.Printf("Forwarding: %s:%d\n", c.config.BaseUrl, port)
 	fmt.Println("-----------------------------------------")
 
 	for {
@@ -60,16 +58,13 @@ func (c *Client) Start() {
 			return
 		}
 
-		prettyJSON, _ := json.MarshalIndent(request, "", "  ")
-		fmt.Printf("Incomming request:\n%s\n", string(prettyJSON))
-
 		// this is blocking
 		c.handleRequest(connection, tunnelInfo, request)
 	}
 }
 
-func (c *Client) prepareUrl(tunnelInfo dto.ClientTunnelInfo, request dto.Request) string {
-	baseURL, err := url.Parse(fmt.Sprintf("%s:%d", baseUrl, c.port))
+func (c *Client) prepareClientUrl(request dto.Request) string {
+	baseURL, err := url.Parse(fmt.Sprintf("%s:%d", c.config.BaseUrl, c.port))
 	if err != nil {
 		fmt.Println("Invalid base URL: %w", err)
 		return ""
@@ -91,15 +86,13 @@ func (c *Client) prepareUrl(tunnelInfo dto.ClientTunnelInfo, request dto.Request
 		}
 	}
 
-	query.Set("tunnelId", tunnelInfo.Id)
 	baseURL.RawQuery = query.Encode()
 	localURL := baseURL.String()
-	log.Printf("Forwarding to: %s", localURL)
 	return localURL
 }
 
-func (c *Client) sendRequest(conn *websocket.Conn, tunnelInfo dto.ClientTunnelInfo, request dto.Request) (*http.Response, error) {
-	localURL := c.prepareUrl(tunnelInfo, request)
+func (c *Client) sendRequest(conn *websocket.Conn, tunnelInfo dto.TunnelInfo, request dto.Request) (*http.Response, error) {
+	localURL := c.prepareClientUrl(request)
 	httpReq, err := http.NewRequest(request.Method, localURL, bytes.NewReader(request.Body))
 
 	if err != nil {
@@ -117,6 +110,7 @@ func (c *Client) sendRequest(conn *websocket.Conn, tunnelInfo dto.ClientTunnelIn
 
 	httpReq.Header.Add("x-tunnel-id", tunnelInfo.Id)
 	httpClient := &http.Client{}
+	log.Printf("Sending: %s", localURL)
 	return httpClient.Do(httpReq)
 }
 
@@ -152,7 +146,7 @@ func (c *Client) sendResponseToTunnel(conn *websocket.Conn, requestId string, ra
 	return err
 }
 
-func (c *Client) handleRequest(conn *websocket.Conn, tunnelInfo dto.ClientTunnelInfo, request dto.Request) {
+func (c *Client) handleRequest(conn *websocket.Conn, tunnelInfo dto.TunnelInfo, request dto.Request) {
 	response, err := c.sendRequest(conn, tunnelInfo, request)
 
 	if err != nil {
