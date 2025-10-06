@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"sync"
 
 	"github.com/gorilla/websocket"
@@ -21,12 +22,14 @@ type Tunnel struct {
 
 type Server struct {
 	mutex   sync.RWMutex
+	config  *Config
 	tunnels map[string]*Tunnel
 }
 
-func New() *Server {
+func New(config *Config) *Server {
 	return &Server{
 		tunnels: make(map[string]*Tunnel),
+		config:  config,
 	}
 }
 
@@ -36,8 +39,25 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
+func (s *Server) extractTunnelID(r *http.Request) string {
+	host := r.Host
+
+	portIndex := strings.Index(host, ":")
+	if portIndex != -1 {
+		host = host[:portIndex]
+	}
+
+	// check subdomain pattern
+	if !strings.HasSuffix(host, fmt.Sprintf(".%s", s.config.Domain)) {
+		return ""
+	}
+
+	tunnelId := strings.TrimSuffix(host, fmt.Sprintf(".%s", s.config.Domain))
+	return tunnelId
+}
+
 func (s *Server) HandleHttp(w http.ResponseWriter, r *http.Request) {
-	tunnelId := r.URL.Query().Get("tunnelId")
+	tunnelId := s.extractTunnelID(r)
 	if len(tunnelId) == 0 {
 		fmt.Println("Invalid tunnel id", tunnelId)
 		http.Error(w, "Invalid tunnel id", http.StatusNotFound)
@@ -56,7 +76,7 @@ func (s *Server) HandleHttp(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Printf("Tunnel id from http handler %v\n", tunnelId)
 
-	request := dto.ToRequest(r)
+	request := dto.CreateRequest(r)
 	if request == nil {
 		fmt.Println("Something went wrong!", request)
 		http.Error(w, "Something went wrong!", http.StatusInternalServerError)
@@ -79,7 +99,6 @@ func (s *Server) HandleHttp(w http.ResponseWriter, r *http.Request) {
 	s.mutex.Unlock()
 
 	defer func() {
-		// cleanup
 		s.mutex.Lock()
 		close(responseChannel)
 		delete(tunnelDetails.responseChannels, request.Id)
@@ -99,7 +118,6 @@ func (s *Server) HandleHttp(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(response.Status)
 	w.Write(response.Body)
-	utils.SendJSONResponse(w, http.StatusOK, response)
 }
 
 func (s *Server) HandleNewConnection(w http.ResponseWriter, r *http.Request) {
@@ -133,9 +151,9 @@ func (s *Server) HandleNewConnection(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("Client connected, new connection created!", tunnelId)
 
-	tunnelInfo := dto.ClientTunnelInfo{
+	tunnelInfo := dto.TunnelInfo{
 		Id:  tunnelId,
-		Url: fmt.Sprintf("http://localhost:8000/?tunnelId=%s", tunnelId),
+		Url: fmt.Sprintf("http://%s.%s:%d", tunnelId, s.config.Domain, s.config.Port),
 	}
 
 	fmt.Printf("TunnelInfo %+v\n", tunnelInfo)

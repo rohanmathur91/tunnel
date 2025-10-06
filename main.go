@@ -11,7 +11,8 @@ import (
 const port = 8000
 
 func main() {
-	wsServer := server.New()
+	config := server.LoadConfig()
+	wsServer := server.New(&config)
 
 	http.HandleFunc("/", wsServer.HandleHttp) // http
 	http.HandleFunc("/tunnel", wsServer.HandleNewConnection)

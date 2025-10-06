@@ -8,7 +8,7 @@ import (
 	"github.com/rohanmathur91/tunnel/utils"
 )
 
-type ClientTunnelInfo struct {
+type TunnelInfo struct {
 	Id  string `json:"id"`
 	Url string `json:"url"`
 }
@@ -29,7 +29,7 @@ type Response struct {
 	Status    int                 `json:"status"`
 }
 
-func ToRequest(r *http.Request) *Request {
+func CreateRequest(r *http.Request) *Request {
 	body, err := io.ReadAll(r.Body)
 	defer r.Body.Close()
 
