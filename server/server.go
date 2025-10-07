@@ -125,7 +125,7 @@ func (s *Server) HandleNewConnection(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		fmt.Println("Cannot create new connection", err)
-		http.Error(w, "Failed to upgrade", http.StatusInternalServerError)
+		http.Error(w, "Failed to upgrade", http.StatusBadRequest)
 		return
 	}
 
