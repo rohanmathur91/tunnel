@@ -2,6 +2,9 @@ package main
 
 import (
 	"flag"
+	"fmt"
+	"os"
+	"os/signal"
 )
 
 func main() {
@@ -10,5 +13,10 @@ func main() {
 
 	config := LoadConfig()
 	client := NewClient(*port, &config)
-	client.Start()
+	go client.Start()
+	defer fmt.Println(" Tunnel closed!!!")
+
+	signalChan := make(chan os.Signal, 1)
+	signal.Notify(signalChan)
+	<-signalChan
 }
