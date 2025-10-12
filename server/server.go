@@ -75,16 +75,16 @@ func (s *Server) HandleHttp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	request := dto.CreateRequest(r)
-	if request == nil {
-		fmt.Println("Something went wrong!", request)
+	request, err := dto.CreateRequest(r)
+	if err != nil {
+		fmt.Println("Something went wrong!", err)
 		http.Error(w, "Something went wrong!", http.StatusInternalServerError)
 		return
 	}
 
 	fmt.Println("Forwarding request...")
 
-	err := tunnelDetails.connection.WriteJSON(request)
+	err = tunnelDetails.connection.WriteJSON(request)
 	if err != nil {
 		log.Fatal("Failed to forward request", err)
 		http.Error(w, "Failed to forward request", http.StatusInternalServerError)

@@ -2,7 +2,6 @@ package dto
 
 import (
 	"io"
-	"log"
 	"net/http"
 
 	"github.com/rohanmathur91/tunnel/utils"
@@ -29,38 +28,36 @@ type Response struct {
 	Status    int                 `json:"status"`
 }
 
-func CreateRequest(r *http.Request) *Request {
+func CreateRequest(r *http.Request) (Request, error) {
 	body, err := io.ReadAll(r.Body)
 	defer r.Body.Close()
 
 	if err != nil {
-		log.Fatal("Cannot read the request body", string(body))
-		return nil
+		return Request{}, err
 	}
 
-	return &Request{
+	return Request{
 		Id:     utils.GenerateID(),
 		Method: r.Method,
 		Header: r.Header,
 		Path:   r.URL.Path,
 		Query:  r.URL.RawQuery,
 		Body:   body,
-	}
+	}, nil
 }
 
-func CreateResponse(requestId string, response *http.Response) *Response {
+func CreateResponse(requestId string, response *http.Response) (Response, error) {
 	body, err := io.ReadAll(response.Body)
 	defer response.Body.Close()
 
 	if err != nil {
-		log.Fatal("Error while reading reponse body ", err)
-		return nil
+		return Response{}, err
 	}
 
-	return &Response{
+	return Response{
 		RequestId: requestId,
 		Header:    response.Header,
 		Status:    response.StatusCode,
 		Body:      body,
-	}
+	}, nil
 }

@@ -112,7 +112,7 @@ func (c *Client) executeRequest(conn *websocket.Conn, request dto.Request) (*htt
 }
 
 func (c *Client) sendErrorResponseToTunnel(conn *websocket.Conn, requestId string, status int, message string) error {
-	res := &dto.Response{
+	res := dto.Response{
 		RequestId: requestId,
 		Status:    status,
 		Body:      []byte(message),
@@ -123,8 +123,14 @@ func (c *Client) sendErrorResponseToTunnel(conn *websocket.Conn, requestId strin
 }
 
 func (c *Client) sendResponseToTunnel(conn *websocket.Conn, requestId string, rawResponse *http.Response) error {
-	res := dto.CreateResponse(requestId, rawResponse)
-	err := conn.WriteJSON(res)
+	res, err := dto.CreateResponse(requestId, rawResponse)
+
+	if err != nil {
+		log.Fatal("Error while creating response dto ", err)
+		return err
+	}
+
+	err = conn.WriteJSON(res)
 	return err
 }
 
@@ -133,7 +139,12 @@ func (c *Client) handleRequest(conn *websocket.Conn, request dto.Request) {
 
 	if err != nil {
 		c.sendErrorResponseToTunnel(conn, request.Id, http.StatusInternalServerError, err.Error())
-	} else {
-		c.sendResponseToTunnel(conn, request.Id, response)
+		return
+	}
+
+	err = c.sendResponseToTunnel(conn, request.Id, response)
+	if err != nil {
+		log.Fatal("Error while sending response to tunnel ", err)
+		return
 	}
 }
