@@ -12,14 +12,16 @@ import (
 )
 
 type Client struct {
-	port   int
-	config Config
+	port       int
+	config     Config
+	httpClient *http.Client
 }
 
 func NewClient(port int, config *Config) *Client {
 	return &Client{
-		port:   port,
-		config: *config,
+		port:       port,
+		config:     *config,
+		httpClient: &http.Client{},
 	}
 }
 
@@ -106,9 +108,8 @@ func (c *Client) executeRequest(conn *websocket.Conn, request dto.Request) (*htt
 		}
 	}
 
-	httpClient := &http.Client{}
-	log.Printf("Sending: %s", localURL)
-	return httpClient.Do(httpReq)
+	log.Printf("Sending client request: %s", localURL)
+	return c.httpClient.Do(httpReq)
 }
 
 func (c *Client) sendErrorResponseToTunnel(conn *websocket.Conn, requestId string, status int, message string) error {
