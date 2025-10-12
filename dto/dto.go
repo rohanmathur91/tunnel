@@ -47,3 +47,20 @@ func CreateRequest(r *http.Request) *Request {
 		Body:   body,
 	}
 }
+
+func CreateResponse(requestId string, response *http.Response) *Response {
+	body, err := io.ReadAll(response.Body)
+	defer response.Body.Close()
+
+	if err != nil {
+		log.Fatal("Error while reading reponse body ", err)
+		return nil
+	}
+
+	return &Response{
+		RequestId: requestId,
+		Header:    response.Header,
+		Status:    response.StatusCode,
+		Body:      body,
+	}
+}

@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -123,23 +122,9 @@ func (c *Client) sendErrorResponseToTunnel(conn *websocket.Conn, requestId strin
 	return err
 }
 
-func (c *Client) sendResponseToTunnel(conn *websocket.Conn, requestId string, rawResponse http.Response) error {
-	body, err := io.ReadAll(rawResponse.Body)
-	if err != nil {
-		fmt.Println("Error while reading body ", err)
-		return err
-	}
-
-	defer rawResponse.Body.Close()
-
-	res := &dto.Response{
-		RequestId: requestId,
-		Header:    rawResponse.Header,
-		Status:    rawResponse.StatusCode,
-		Body:      body,
-	}
-
-	err = conn.WriteJSON(res)
+func (c *Client) sendResponseToTunnel(conn *websocket.Conn, requestId string, rawResponse *http.Response) error {
+	res := dto.CreateResponse(requestId, rawResponse)
+	err := conn.WriteJSON(res)
 	return err
 }
 
@@ -149,6 +134,6 @@ func (c *Client) handleRequest(conn *websocket.Conn, request dto.Request) {
 	if err != nil {
 		c.sendErrorResponseToTunnel(conn, request.Id, http.StatusInternalServerError, err.Error())
 	} else {
-		c.sendResponseToTunnel(conn, request.Id, *response)
+		c.sendResponseToTunnel(conn, request.Id, response)
 	}
 }
