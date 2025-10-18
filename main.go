@@ -8,8 +8,6 @@ import (
 	"github.com/rohanmathur91/tunnel/server"
 )
 
-const port = 8000
-
 func main() {
 	config := server.LoadConfig()
 	wsServer := server.New(&config)
@@ -20,10 +18,10 @@ func main() {
 	http.HandleFunc("/health", wsServer.HandleHealthCheck)
 
 	httpServer := http.Server{
-		Addr: fmt.Sprintf(":%d", port),
+		Addr: fmt.Sprintf(":%d", config.Port),
 	}
 
-	fmt.Printf("Server running on port %d... \n", port)
+	fmt.Printf("Server running on port %d... \n", config.Port)
 
 	err := httpServer.ListenAndServe()
 
